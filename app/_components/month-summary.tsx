@@ -7,6 +7,7 @@ import { isAbove } from "@/modules/category";
 import { getExpensesByMonth, getExpensesSummary } from "@/modules/expense";
 import { Expense } from "@/modules/types";
 import { MONTHS } from "@/utils/date";
+import { round2dp } from "@/utils/number";
 import { cn } from "@/utils/style";
 import { getMonth } from "date-fns";
 import { Fragment, useState } from "react";
@@ -64,12 +65,17 @@ export function MonthSummary({ expenses }: MonthSummaryProps) {
 
           const isAboveLimits = isAbove(summary.categoryKey, summary.total);
 
+          const [dollar, cents] = round2dp(summary.total).split(".");
+
           return (
             <Fragment key={summary.categoryKey}>
               <div className="text-muted-foreground">{summary.categoryKey}</div>
               <div className="tabular-nums flex items-center justify-end space-x-1 pr-2">
-                <div className="text-sm text-gray-600">$</div>
-                <div>{summary.total}</div>
+                {/* <div className="text-sm text-gray-600">$</div> */}
+                <div className="text-sm">
+                  {dollar}
+                  <span className="text-muted-foreground">.{cents}</span>
+                </div>
               </div>
               <div>
                 <div

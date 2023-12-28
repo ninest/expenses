@@ -13,7 +13,7 @@ const config = {
       },
     },
     extend: {
-      fontFamily: { sans: ["var(--font-geist-sans)"], mono: ["var(--font-geist-mono)"] },
+      fontFamily: { default: ["var(--font-inter)"], sans: ["var(--font-inter)"] },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

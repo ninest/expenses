@@ -13,7 +13,7 @@ export const categories: DisplayCategory[] = [
   { key: "living", emoji: "🛟", softLimit: 175, limit: 200 },
   { key: "food", emoji: "🌮", softLimit: 100, limit: 125 },
   { key: "transport", emoji: "🚋", softLimit: 35, limit: 50 },
-  { key: "entertainment", emoji: "🍿", softLimit: 125, limit: 150 },
+  { key: "fun", emoji: "🍿", softLimit: 125, limit: 150 },
   { key: "education", emoji: "🎒" },
   { key: "savings", emoji: "💵" },
 ];

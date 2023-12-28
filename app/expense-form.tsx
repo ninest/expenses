@@ -2,6 +2,7 @@
 
 import { createExpenseAction } from "@/app/_actions/expenses-actions";
 import { CategoryInput } from "@/app/_components/category-input";
+import { Debug } from "@/components/debug";
 import { NoElementsEmpty } from "@/components/empty";
 import { NumberInput } from "@/components/number-input";
 import { Spacer } from "@/components/spacer";
@@ -23,21 +24,21 @@ import { z } from "zod";
 const expenseFormSchema = z
   .object({
     category: z.string(),
-    amount: z.number().min(0.001),
+    amount: z.number().min(0.001, "The amount can't be zero"),
     notes: z.string().default(""),
     receipt: z.array(z.object({ url: z.string().url() })),
     isSplit: z.boolean().default(false),
     totalWithoutTip: z.number().optional(),
     tipPercent: z.number().optional(),
-    friends: z.array(z.object({ friendName: z.string(), amount: z.number() })),
+    friends: z.array(z.object({ friendName: z.string().min(2), amount: z.number() })),
   })
   .refine((data) => !data.isSplit || (data.isSplit && data.totalWithoutTip !== undefined && data.totalWithoutTip > 0), {
     path: ["totalWithoutTip"],
-    message: "Total without tip is required when splitting.",
+    message: "Total without tip is required when splitting",
   })
   .refine((data) => data.isSplit === false || (data.isSplit === true && data.tipPercent !== undefined), {
     path: ["tipPercent"],
-    message: "Tip percent is required when splitting.",
+    message: "Tip percent is required when splitting",
   });
 
 type ExpenseFormType = z.infer<typeof expenseFormSchema>;
@@ -140,12 +141,15 @@ export function ExpenseForm() {
   const friends = form.watch("friends");
 
   const friendPayments =
-    friends?.map((friend) => ({
-      friendName: friend.friendName,
-      amount: friend.amount,
-      tip: (friend.amount * tipPercent) / 100,
-      amountWithTip: friend.amount + (friend.amount * tipPercent) / 100,
-    })) ?? [];
+    friends?.map((friend) => {
+      const friendAmount = isNaN(friend.amount) ? 0 : friend.amount;
+      return {
+        friendName: friend.friendName,
+        amount: friendAmount,
+        tip: (friendAmount * tipPercent) / 100,
+        amountWithTip: friendAmount + (friendAmount * tipPercent) / 100 ,
+      };
+    }) ?? [];
   const totalFriendPaymentWithoutTip = friendPayments.reduce((total, fp) => fp.amount + total, 0);
   const totalFriendPaymentWithTip = friendPayments.reduce((total, fp) => fp.amountWithTip + total, 0);
 
@@ -164,44 +168,45 @@ export function ExpenseForm() {
             name="category"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Category</FormLabel>
                 <CategoryInput categoryKey={field.value} selectCategory={field.onChange} />
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          {/* <div className="flex items-top justify-between space-x-4"> */}
-          <FormField
-            control={form.control}
-            name="amount"
-            render={({ field }) => {
-              return (
+          <div className="flex items-top justify-between space-x-4">
+            <FormField
+              control={form.control}
+              name="amount"
+              render={({ field }) => {
+                return (
+                  <FormItem className="flex-1">
+                    <FormControl>
+                      <NumberInput
+                        prefixBefore="$"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
+
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
                 <FormItem className="flex-1">
-                  <FormLabel>Amount</FormLabel>
                   <FormControl>
-                    <NumberInput prefixBefore="$" {...field} onChange={(e) => field.onChange(e.target.valueAsNumber)} />
+                    <Input placeholder="Notes" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
-              );
-            }}
-          />
-
-          <FormField
-            control={form.control}
-            name="notes"
-            render={({ field }) => (
-              <FormItem className="flex-1">
-                <FormLabel>Notes</FormLabel>
-                <FormControl>
-                  <Input placeholder="Notes" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          {/* </div> */}
+              )}
+            />
+          </div>
 
           <FormField
             control={form.control}
@@ -258,6 +263,7 @@ export function ExpenseForm() {
             <Spacer className="h-2" />
 
             <div className="space-y-4">
+              {/* isSplit checkbox */}
               <FormField
                 control={form.control}
                 name="isSplit"
@@ -278,53 +284,79 @@ export function ExpenseForm() {
 
               {form.watch("isSplit") && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between space-x-4">
-                    <FormField
-                      control={form.control}
-                      name="totalWithoutTip"
-                      render={({ field }) => {
-                        return (
-                          <FormItem className="flex-1">
-                            <FormLabel>Total</FormLabel>
-                            <FormControl>
-                              <NumberInput
-                                prefixBefore="$"
-                                {...field}
-                                onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="tipPercent"
-                      render={({ field }) => {
-                        return (
-                          <FormItem className="flex-1">
-                            <FormLabel>Tip percent</FormLabel>
-                            <FormControl>
-                              <NumberInput
-                                placeholder="0"
-                                prefixAfter="%"
-                                {...field}
-                                onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
-                    />
+                  <div className="space-y-2">
+                    <div className="flex items-end justify-between space-x-4">
+                      {/* Total amount */}
+                      <FormField
+                        control={form.control}
+                        name="totalWithoutTip"
+                        render={({ field }) => {
+                          return (
+                            <FormItem className="flex-1">
+                              <FormControl>
+                                <NumberInput
+                                  prefixBefore="$"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          );
+                        }}
+                      />
+
+                      {/* Tip percent */}
+                      <FormField
+                        control={form.control}
+                        name="tipPercent"
+                        render={({ field }) => {
+                          return (
+                            <FormItem className="flex-1">
+                              <FormControl>
+                                <NumberInput
+                                  placeholder="0"
+                                  prefixAfter="%"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    </div>
+                    {/* error messages for total amount and tip */}
+                    <div>
+                      <FormField
+                        control={form.control}
+                        name="totalWithoutTip"
+                        render={({ field }) => {
+                          return (
+                            <FormItem>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="tipPercent"
+                        render={({ field }) => {
+                          return (
+                            <FormItem>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    </div>
                   </div>
 
                   <div>
                     <Title level={3}>Friends</Title>
                     <Spacer className="h-2" />
                     {friendsField.fields.length === 0 && <NoElementsEmpty children="No friends yet." />}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {friendsField.fields.map((field, index) => (
                         <div key={field.id} className="flex items-center justify-between space-x-4">
                           <FormField
@@ -332,9 +364,8 @@ export function ExpenseForm() {
                             name={`friends.${index}.friendName`}
                             render={({ field }) => (
                               <FormItem className="flex-1">
-                                <FormLabel>Name</FormLabel>
                                 <FormControl>
-                                  <Input {...field} />
+                                  <Input placeholder="Name" {...field} />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -348,7 +379,6 @@ export function ExpenseForm() {
                               render={({ field }) => {
                                 return (
                                   <FormItem className="flex-1">
-                                    <FormLabel>Amount without tip</FormLabel>
                                     <FormControl>
                                       <NumberInput
                                         prefixBefore="$"
@@ -392,36 +422,40 @@ export function ExpenseForm() {
                       <Title level={3}>Summary</Title>
                       <Spacer className="h-2" />
 
-                      <div className="bg-gray-100 shadow dark:bg-gray-900 p-3 gap-0 tabular-nums max-w-[25rem]">
+                      <div className="bg-gradient-to-br from-gray-100 dark:to-gray-950 dark:from-gray-900 to-gray-50 border rounded rotate-[1deg] shadow  px-7 py-12 gap-0 tabular-nums max-w-[25rem]">
                         <div className="grid grid-cols-2">
                           <div>Total without tip:</div>
                           <div className="justify-self-end">{round2dp(totalWithoutTip)}</div>
                           <div>Tip:</div>
                           <div className="justify-self-end">{round2dp(tip)}</div>
                         </div>
-                        <hr className="my-1" />
+                        <hr className="my-2" />
                         <div className="grid grid-cols-2">
                           <div className="font-bold">Total:</div>
                           <div className="justify-self-end font-bold">{round2dp(totalWithTip)}</div>
 
-                          {friendPayments.map((friend) => {
+                          {friendPayments.map((friend, index) => {
                             return (
                               <Fragment key={Math.random() + friend.friendName}>
-                                <div>{friend.friendName}:</div>
+                                <div className="ml-3">{!!friend.friendName ? friend.friendName : `Friend ${index + 1}`}:</div>
                                 <div className="justify-self-end">
-                                  <span className="text-muted-foreground">
-                                    {round2dp(friend.amount)} + {round2dp(friend.tip)} ={" "}
-                                  </span>
+                                  {tipPercent !== 0 && (
+                                    <span className="text-muted-foreground">
+                                      {round2dp(friend.amount)} + {round2dp(friend.tip)} ={" "}
+                                    </span>
+                                  )}
                                   {round2dp(friend.amountWithTip)}
                                 </div>
                               </Fragment>
                             );
                           })}
-                          <div>Remaining:</div>
+                          <div className="ml-3">Remaining:</div>
                           <div className="justify-self-end">
-                            <span className="text-muted-foreground">
-                              {round2dp(remaining)} + {round2dp(remainingTip)} =
-                            </span>{" "}
+                            {tipPercent !== 0 && (
+                              <span className="text-muted-foreground">
+                                {round2dp(remaining)} + {round2dp(remainingTip)} ={" "}
+                              </span>
+                            )}
                             {round2dp(remainingWithTip)}
                           </div>
                         </div>
@@ -433,11 +467,11 @@ export function ExpenseForm() {
             </div>
           </section>
 
-          <Button>Submit</Button>
+          <Button className="w-full">Submit</Button>
         </form>
       </Form>
 
-      {/* <Debug className="mt-4" data={{ data: form.watch(), errors: form.formState.errors }} /> */}
+      {/* <Debug className="mt-4" data={{ friendPayments }} /> */}
     </>
   );
 }
